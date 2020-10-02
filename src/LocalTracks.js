@@ -3,6 +3,7 @@ import _ from "lodash";
 import { componentGetCompareProps } from "./Shared";
 import "./LocalTracks.css";
 
+// input selection as well as device objects
 export class LocalTracks extends React.Component {
   constructor(props) {
     super(props);
@@ -13,8 +14,8 @@ export class LocalTracks extends React.Component {
       loaded: false,
     };
     this.videoRef = React.createRef();
-    this.micRef = React.createRef();
-    this.trackList = [];
+    //    this.micRef = React.createRef();
+    //    this.trackList = [];
   }
 
   componentDidMount() {
@@ -23,6 +24,7 @@ export class LocalTracks extends React.Component {
       defaultMicId,
       defaultVideoId,
       activeRoomId,
+      jitsiController,
     } = this.props;
 
     window.JitsiMeetJS.createLocalTracks({ devices: ["audio", "video"] }).then(
@@ -30,7 +32,7 @@ export class LocalTracks extends React.Component {
         let deviceIds = _.map(deviceList, (nd) => nd.id);
         for (let track of tracks) {
           if (_.indexOf(deviceIds, track.deviceId) !== -1) {
-            this.trackList.push(track);
+            jitsiController.trackList.push(track);
           }
         }
         this.setState(
@@ -45,10 +47,10 @@ export class LocalTracks extends React.Component {
             this.updateLocalTrack(defaultVideoId, "set");
 
             if (activeRoomId && this.props.jitsiController.activeRoom) {
-              let videoTrack = _.find(this.trackList, (t) => {
+              let videoTrack = _.find(jitsiController.trackList, (t) => {
                 return t.deviceId === defaultVideoId;
               });
-              let micTrack = _.find(this.trackList, (t) => {
+              let micTrack = _.find(jitsiController.trackList, (t) => {
                 return t.deviceId === defaultMicId;
               });
               if (videoTrack) {
@@ -73,24 +75,28 @@ export class LocalTracks extends React.Component {
   };
 
   updateLocalTrack = (deviceId, action = "clear") => {
+    const { jitsiController } = this.props;
+
     if (action === "clear") {
-      let clearTrack = _.find(this.trackList, { deviceId: deviceId });
+      let clearTrack = _.find(jitsiController.trackList, {
+        deviceId: deviceId,
+      });
       if (clearTrack) {
         // eslint-disable-next-line default-case
         switch (clearTrack.getType()) {
           case "audio":
-            if (this.micRef.current) {
-              clearTrack.detach(this.micRef.current);
-              clearTrack.removeEventListener(
-                window.JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
-                this.onTrackStoppedEvent
-              );
-              clearTrack.removeEventListener(
-                window.JitsiMeetJS.events.track.TRACK_AUDIO_OUTPUT_CHANGED,
-                this.onTrackAudioOutputChangedEvent
-              );
-              clearTrack.dispose();
-            }
+            // if (this.micRef.current) {
+            //   clearTrack.detach(this.micRef.current);
+            //   clearTrack.removeEventListener(
+            //     window.JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
+            //     this.onTrackStoppedEvent
+            //   );
+            //   clearTrack.removeEventListener(
+            //     window.JitsiMeetJS.events.track.TRACK_AUDIO_OUTPUT_CHANGED,
+            //     this.onTrackAudioOutputChangedEvent
+            //   );
+            //   clearTrack.dispose();
+            // }
             break;
           case "video":
             if (this.videoRef.current) {
@@ -101,25 +107,25 @@ export class LocalTracks extends React.Component {
         }
       }
     } else if (action === "set") {
-      let setTrack = _.find(this.trackList, (t) => {
+      let setTrack = _.find(jitsiController.trackList, (t) => {
         return t.deviceId === deviceId;
       });
       if (setTrack) {
         // eslint-disable-next-line default-case
         switch (setTrack.getType()) {
           case "audio":
-            if (this.micRef.current) {
-              setTrack.attach(this.micRef.current);
-              setTrack.addEventListener(
-                window.JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
-                this.onTrackStoppedEvent
-              );
-              setTrack.addEventListener(
-                window.JitsiMeetJS.events.track.TRACK_AUDIO_OUTPUT_CHANGED,
-                this.onTrackAudioOutputChangedEvent
-              );
-              setTrack.mute();
-            }
+            // if (this.micRef.current) {
+            //   setTrack.attach(this.micRef.current);
+            //   setTrack.addEventListener(
+            //     window.JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
+            //     this.onTrackStoppedEvent
+            //   );
+            //   setTrack.addEventListener(
+            //     window.JitsiMeetJS.events.track.TRACK_AUDIO_OUTPUT_CHANGED,
+            //     this.onTrackAudioOutputChangedEvent
+            //   );
+            //   setTrack.mute();
+            // }
             break;
           case "video":
             if (setTrack && this.videoRef.current) {
@@ -132,6 +138,8 @@ export class LocalTracks extends React.Component {
   };
 
   componentDidUpdate(prevProps, prevState) {
+    const { jitsiController } = this.props;
+
     const selectedVideoDeviceId = componentGetCompareProps(
       "selectedVideoDeviceId",
       this.state,
@@ -174,17 +182,17 @@ export class LocalTracks extends React.Component {
     if (activeRoomId.HasChanged) {
       if (activeRoomId.Current && this.props.jitsiController.activeRoom) {
         const { selectedMicDeviceId, selectedVideoDeviceId } = this.state;
-        let videoTrack = _.find(this.trackList, (t) => {
+        let videoTrack = _.find(jitsiController.trackList, (t) => {
           return t.deviceId === selectedVideoDeviceId;
         });
-        let micTrack = _.find(this.trackList, (t) => {
+        let micTrack = _.find(jitsiController.trackList, (t) => {
           return t.deviceId === selectedMicDeviceId;
         });
         if (videoTrack) {
-          this.props.jitsiController.activeRoom.addTrack(videoTrack);
+          jitsiController.activeRoom.addTrack(videoTrack);
         }
         if (micTrack) {
-          this.props.jitsiController.activeRoom.addTrack(micTrack);
+          jitsiController.activeRoom.addTrack(micTrack);
         }
       }
     }
@@ -205,6 +213,7 @@ export class LocalTracks extends React.Component {
     this.setState({ selectedMicDeviceId: event.target.value });
   };
 
+  // 🕊🌺🍀🦄🧚‍♀️🧜‍♀️❤️🧡💛💚💙💜
   render() {
     const {
       selectedVideoDeviceId,

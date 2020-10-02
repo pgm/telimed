@@ -1,77 +1,111 @@
 import React from "react";
 import "./App.css";
 import { LocalTracks } from "./LocalTracks";
-import { LocalSpeaker } from "./LocalSpeaker";
 import _ from "lodash";
-import { RemoteTrack } from "./RemoteTrack";
-import { v4 as uuidv4 } from "uuid";
+// import { RemoteTrack } from "./RemoteTrack";
+// import { v4 as uuidv4 } from "uuid";
+import { Settings } from "./Settings";
 
-export class App extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      serverURL: "beta.meet.jit.si",
-      roomId: "pgmtest",
-      selectedSpeakerDeviceId: "",
-      defaultMicId: "",
-      defaultVideoId: "",
-      defaultSpeakerId: "",
-      deviceList: [],
-      status: "closed",
-      lastError: "",
-      remoteTrackIds: [],
-      loaded: false,
-      activeRoomId: null,
-    };
+class JistiStuff {
+  constructor(serverURL) {
+    this.serverURL = serverURL;
+    this.remoteTracks = [];
+    this.onRoomTracksChanged = [];
   }
 
-  componentDidMount() {
-    window.JitsiMeetJS.mediaDevices.enumerateDevices((devices) => {
-      let newDeviceList = [];
-      for (let device of devices) {
-        // if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
-        newDeviceList.push({
-          name: device.label,
-          id: device.deviceId,
-          type: device.kind,
-        });
-        // }
+  enumerateDevices() {
+    const promise = new Promise((resolve, reject) => {
+      window.JitsiMeetJS.mediaDevices.enumerateDevices((devices) =>
+        resolve(devices)
+      );
+    });
+
+    return promise;
+  }
+
+  disconnect() {
+    return this.activeRoom.leave().then(() => {
+      if (this.activeConnection) {
+        this.activeConnection.disconnect();
       }
-      let micId =
-        (_.find(newDeviceList, { type: "audioinput" }) || {}).id || "none";
-      let videoId =
-        (_.find(newDeviceList, { type: "videoinput" }) || {}).id || "none";
-      let speakerId =
-        (_.find(newDeviceList, { type: "audiooutput" }) || {}).id || "none";
-      this.setState({
-        deviceList: newDeviceList,
-        defaultMicId: micId,
-        defaultVideoId: videoId,
-        defaultSpeakerId: speakerId,
-        loaded: true,
-      });
     });
   }
 
-  componentDidUpdate() {}
-
-  onSpeakerChanged = (newSpeaker) => {
-    this.setState({
-      selectedSpeakerDeviceId: newSpeaker.id,
+  connect(roomId) {
+    this.activeConnection = new window.JitsiMeetJS.JitsiConnection(null, null, {
+      hosts: {
+        domain: this.serverURL,
+        muc: `conference.${this.serverURL}`, // FIXME: use XEP-0030
+      },
+      serviceUrl: `wss://${this.serverURL}/xmpp-websocket?room=${roomId}`,
+      clientNode: `https://${this.serverURL}`,
     });
-  };
 
-  onServerChanged = (event) => {
-    this.setState({
-      serverURL: event.target.value,
+    const promise = new Promise((resolve, reject) => {
+      // onConnectionSuccess = () => {
+      //   const { roomId } = this.props;
+      //   this.activeRoom = this.activeConnection.initJitsiConference(roomId, {
+      //     openBridgeChannel: true,
+      //   });
+      //   this.activeRoom.addEventListener(
+      //     window.JitsiMeetJS.events.conference.TRACK_ADDED,
+      //     this.onRoomTrackAdded
+      //   );
+      //   this.activeRoom.addEventListener(
+      //     window.JitsiMeetJS.events.conference.TRACK_REMOVED,
+      //     this.onRoomTrackRemoved
+      //   );
+      //   this.activeRoom.join();
+      //   resolve();
+      // };
+      // onConnectionDisconnect = () => {
+      //   this.props.jitsiController.activeConnection.removeEventListener(
+      //     window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
+      //     this.onConnectionSuccess
+      //   );
+      //   this.props.jitsiController.activeConnection.removeEventListener(
+      //     window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
+      //     this.onConnectionFailed
+      //   );
+      //   this.props.jitsiController.activeConnection.removeEventListener(
+      //     window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
+      //     this.onConnectionDisconnect
+      //   );
+      //   this.props.jitsiController.activeRoom.removeEventListener(
+      //     window.JitsiMeetJS.events.conference.TRACK_ADDED,
+      //     this.onRoomTrackAdded
+      //   );
+      //   this.props.jitsiController.activeRoom.removeEventListener(
+      //     window.JitsiMeetJS.events.conference.TRACK_REMOVED,
+      //     this.onRoomTrackRemoved
+      //   );
+      // };
+      // onConnectionFailed = (a, b, c, d) => {
+      //   reject(a);
+      // };
+      // this.activeConnection.addEventListener(
+      //   window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
+      //   onConnectionSuccess
+      // );
+      // this.activeConnection.addEventListener(
+      //   window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
+      //   onConnectionFailed
+      // );
+      // this.activeConnection.addEventListener(
+      //   window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
+      //   this.onConnectionDisconnect
+      // );
+      // this.activeConnection.connect();
     });
-  };
 
-  onRoomChanged = (event) => {
-    this.setState({
-      roomId: event.target.value,
-    });
+    return promise;
+  }
+
+  fireRoomTracksChanged = () => {
+    // remoteTrackIds = _.map(this.props.jitsiController.remoteTracks, (rt) => {
+    //   return { id: rt.id, participantId: rt.participantId };
+    // });
+    // _.forEach(this.onRoomTracksChanged, (listener) => listener(remoteTrackIds));
   };
 
   onRoomTrackAdded = (track) => {
@@ -90,12 +124,9 @@ export class App extends React.Component {
       type: track.getType(),
       track: track,
     };
-    this.props.jitsiController.remoteTracks.push(trackInfo);
-    this.setState({
-      remoteTrackIds: _.map(this.props.jitsiController.remoteTracks, (rt) => {
-        return { id: rt.id, participantId: rt.participantId };
-      }),
-    });
+    this.remoteTracks.push(trackInfo);
+
+    this.fireRoomTracksChanged();
   };
 
   onRoomTrackRemoved = (track) => {
@@ -103,157 +134,112 @@ export class App extends React.Component {
       return;
     }
     let trackId = track.getId();
-    this.props.jitsiController.telimed.remoteTracks = _.reject(
-      this.props.jitsiController.telimed.remoteTracks,
+    this.props.jitsiController.remoteTracks = _.reject(
+      this.props.jitsiController.remoteTracks,
       { id: trackId }
     );
-    this.setState({
-      remoteTrackIds: _.map(
-        this.props.jitsiController.telimed.remoteTracks,
-        (rt) => {
-          return { id: rt.id, participantId: rt.participantId };
-        }
-      ),
-    });
-  };
 
-  onConnectionSuccess = () => {
-    const { roomId } = this.state;
-    try {
-      this.props.jitsiController.activeRoom = this.props.jitsiController.activeConnection.initJitsiConference(
-        roomId,
-        {
-          openBridgeChannel: true,
-        }
-      );
-      this.props.jitsiController.activeRoom.addEventListener(
-        window.JitsiMeetJS.events.conference.TRACK_ADDED,
-        this.onRoomTrackAdded
-      );
-      this.props.jitsiController.activeRoom.addEventListener(
-        window.JitsiMeetJS.events.conference.TRACK_REMOVED,
-        this.onRoomTrackRemoved
-      );
-      // this.activeRoom.on(
-      //     JitsiMeetJS.events.conference.CONFERENCE_JOINED,
-      //     onConferenceJoined);
-      //     this.activeRoom.on(JitsiMeetJS.events.conference.USER_JOINED, id => {
-      //     console.log('user join');
-      //     remoteTracks[id] = [];
-      // });
-      // this.activeRoom.on(JitsiMeetJS.events.conference.USER_LEFT, onUserLeft);
-      // this.activeRoom.on(JitsiMeetJS.events.conference.TRACK_MUTE_CHANGED, track => {
-      //     console.log(`${track.getType()} - ${track.isMuted()}`);
-      // });
-      // this.activeRoom.on(
-      //     JitsiMeetJS.events.conference.DISPLAY_NAME_CHANGED,
-      //     (userID, displayName) => console.log(`${userID} - ${displayName}`));
-      //     this.activeRoom.on(
-      //     JitsiMeetJS.events.conference.TRACK_AUDIO_LEVEL_CHANGED,
-      //     (userID, audioLevel) => console.log(`${userID} - ${audioLevel}`));
-      //     this.activeRoom.on(
-      //     JitsiMeetJS.events.conference.PHONE_NUMBER_CHANGED,
-      //     () => console.log(`${room.getPhoneNumber()} - ${room.getPhonePin()}`));
-      this.props.jitsiController.activeRoom.join();
-      this.setState({
-        status: "open",
-        lastError: "",
-        activeRoomId: uuidv4(),
-      });
-    } catch (error) {
-      this.setState({
-        status: "closed",
-        lastError: error.message,
-      });
-    }
+    this.fireRoomTracksChanged();
   };
+}
 
-  onConnectionFailed = (a, b, c, d) => {
-    this.setState({
+export class App extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      jitsi: JistiStuff(this.props.serverURL),
+      selectedSpeakerDeviceId: "",
+      defaultMicId: "",
+      defaultVideoId: "",
+      defaultSpeakerId: "",
+      deviceList: [],
       status: "closed",
-      lastError: a,
+      lastError: "",
+      remoteTrackIds: [],
+      loaded: false,
       activeRoomId: null,
+    };
+  }
+
+  componentDidMount() {
+    this.jitsi.enumerateDevices().then((devices) => {
+      let newDeviceList = [];
+      for (let device of devices) {
+        // if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
+        newDeviceList.push({
+          name: device.label,
+          id: device.deviceId,
+          type: device.kind,
+        });
+        // }
+      }
+      let micId =
+        (_.find(newDeviceList, { type: "audioinput" }) || {}).id || "none";
+      let videoId =
+        (_.find(newDeviceList, { type: "videoinput" }) || {}).id || "none";
+      let speakerId =
+        (_.find(newDeviceList, { type: "audiooutput" }) || {}).id || "none";
+      console.log("newDeviceList", newDeviceList);
+      this.setState({
+        deviceList: newDeviceList,
+        defaultMicId: micId,
+        defaultVideoId: videoId,
+        defaultSpeakerId: speakerId,
+        loaded: true,
+      });
+    });
+  }
+
+  componentDidUpdate() {}
+
+  onSpeakerChanged = (newSpeakerId) => {
+    this.setState({
+      selectedSpeakerDeviceId: newSpeakerId,
     });
   };
 
-  onConnectionDisconnect = () => {
-    this.props.jitsiController.activeConnection.removeEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      this.onConnectionSuccess
-    );
-    this.props.jitsiController.activeConnection.removeEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
-      this.onConnectionFailed
-    );
-    this.props.jitsiController.activeConnection.removeEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      this.onConnectionDisconnect
-    );
-    this.props.jitsiController.activeRoom.removeEventListener(
-      window.JitsiMeetJS.events.conference.TRACK_ADDED,
-      this.onRoomTrackAdded
-    );
-    this.props.jitsiController.activeRoom.removeEventListener(
-      window.JitsiMeetJS.events.conference.TRACK_REMOVED,
-      this.onRoomTrackRemoved
-    );
+  onRoomTracksChanged = (remoteTrackIds) => {
+    this.setState({
+      remoteTrackIds: remoteTrackIds,
+    });
   };
 
   onConnect = () => {
-    const { roomId, serverURL } = this.state;
+    const { roomId } = this.props;
     this.setState({
       status: "Joining...",
     });
-    this.props.jitsiController.activeConnection = new window.JitsiMeetJS.JitsiConnection(
-      null,
-      null,
-      {
-        hosts: {
-          domain: serverURL,
-          muc: `conference.${serverURL}`, // FIXME: use XEP-0030
-        },
-        serviceUrl: `wss://${serverURL}/xmpp-websocket?room=${roomId}`,
-        clientNode: `https://${serverURL}`,
-      }
-    );
-
-    this.props.jitsiController.activeConnection.addEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      this.onConnectionSuccess
-    );
-    this.props.jitsiController.activeConnection.addEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
-      this.onConnectionFailed
-    );
-    this.props.jitsiController.activeConnection.addEventListener(
-      window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      this.onConnectionDisconnect
-    );
-    this.props.jitsiController.activeConnection.connect();
+    this.state.jitsi
+      .connect()
+      .then(() => {
+        this.setState({
+          status: "open",
+          lastError: "",
+          activeRoomId: roomId,
+        });
+      })
+      .catch((error) => {
+        this.setState({
+          status: "closed",
+          activeRoomId: null,
+          lastError: error,
+        });
+      });
   };
 
   onDisconnect = () => {
-    if (this.props.jitsiController.activeRoom) {
+    if (this.state.activeRoomId) {
       this.setState({
         status: "Leaving...",
       });
-      try {
-        this.props.jitsiController.activeRoom.leave().then(() => {
-          if (this.props.jitsiController.activeConnection) {
-            this.props.jitsiController.activeConnection.disconnect();
-          }
-          this.setState({
-            status: "closed",
-            remoteTracks: [],
-            activeRoomId: null,
-          });
-        });
-      } catch (error) {
+
+      this.state.jitsi.disconnect().then(() => {
         this.setState({
           status: "closed",
-          lastError: error.message,
+          activeRoomId: null,
         });
-      }
+      });
     }
   };
 
@@ -268,11 +254,11 @@ export class App extends React.Component {
     for (let participantId of participantIds) {
       ret.push(
         <div key={participantId} className="B_Body_Block">
-          <RemoteTrack
+          {/* <RemoteTrack
             jitsiController={this.props.jitsiController}
             trackIds={trackGroups[participantId]}
             selectedSpeakerDeviceId={selectedSpeakerDeviceId}
-          />
+          /> */}
         </div>
       );
     }
@@ -283,8 +269,6 @@ export class App extends React.Component {
   render() {
     const {
       selectedSpeakerDeviceId,
-      serverURL,
-      roomId,
       status,
       lastError,
       defaultMicId,
@@ -314,28 +298,6 @@ export class App extends React.Component {
       <div className="App">
         <div className="TL">
           <div>
-            Server:{" "}
-            <input
-              readOnly={status !== "closed"}
-              type="text"
-              onChange={(event) => {
-                this.setState({ serverURL: event.target.value });
-              }}
-              value={serverURL}
-            />
-          </div>
-          <div>
-            Room:{" "}
-            <input
-              readOnly={status !== "closed"}
-              type="text"
-              onChange={(event) => {
-                this.setState({ roomId: event.target.value });
-              }}
-              value={roomId}
-            />
-          </div>
-          <div>
             {status === "closed" ? (
               <button onClick={this.onConnect}>Connect</button>
             ) : status === "open" ? (
@@ -344,17 +306,17 @@ export class App extends React.Component {
               <button disabled={true}>{status}</button>
             )}
           </div>
+          <Settings
+            deviceList={deviceList}
+            key="LocalSpeaker"
+            defaultSpeakerId={defaultSpeakerId}
+            onAudioOutputChange={this.onSpeakerChanged}
+          />
           <div>{lastError}</div>
         </div>
         <div className="TR">
           <div className="TR_Header">
             <h3>Me</h3>
-            <LocalSpeaker
-              deviceList={deviceList}
-              key="LocalSpeaker"
-              defaultSpeakerId={defaultSpeakerId}
-              onSpeakerChanged={this.onSpeakerChanged}
-            />
           </div>
           <div class="TR_Body">
             <div className="TR_Body_Block">

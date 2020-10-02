@@ -27,7 +27,14 @@ export const JitsiApp = () => {
     remoteTracks: [],
     activeConnection: null,
     activeRoom: null,
+    trackList: [],
   };
 
-  return <App jitsiController={jitsiController} />;
+  return (
+    <App
+      serverURL="beta.meet.jit.si"
+      roomId="pgmtest"
+      jitsiController={jitsiController}
+    />
+  );
 };
