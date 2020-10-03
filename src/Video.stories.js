@@ -1,6 +1,6 @@
 import React from "react";
 import _ from "lodash";
-import { Video } from "./Video";
+import { Video, VideoStrip } from "./Video";
 
 export default {
   title: "Components/Video",
@@ -14,13 +14,12 @@ class VideoWrapper extends React.Component {
   }
 
   componentDidMount() {
-    window.JitsiMeetJS.createLocalTracks({ devices: ["audio", "video"] }).then(
+    window.JitsiMeetJS.init({});
+    window.JitsiMeetJS.createLocalTracks({ devices: ["video"] }).then(
       (tracks) => {
         console.log("tracks", tracks);
-
         const videoTrack = _.find(tracks, { type: "video" });
         const audioTrack = _.find(tracks, { type: "audio" });
-
         this.setState({
           videoTrack: videoTrack,
           audioTrack: audioTrack,
@@ -33,20 +32,37 @@ class VideoWrapper extends React.Component {
   render() {
     if (!this.state.loaded) {
       return <p>Loading</p>;
+    }
+    if (this.props.mode == "videostrip") {
+      const videos = [
+        { videoTrack: this.state.videoTrack, label: "Frank" },
+        { videoTrack: this.state.videoTrack, label: "Steve" },
+        { videoTrack: this.state.videoTrack, label: "Mary" },
+      ];
+      return (
+        <VideoStrip videos={videos}>
+          <div className="video-controls">
+            <button>⚙️</button>
+            <button>🎤</button>
+          </div>
+        </VideoStrip>
+      );
     } else {
       return (
         <Video
           videoTrack={this.state.videoTrack}
           audioTrackId={this.state.audioTrack}
+          label={"Me"}
         />
       );
     }
   }
 }
 
-/**
- * Primary UI component for user interaction
- */
-export const LocalVideo = () => {
+export const SingleVideo = () => {
   return <VideoWrapper></VideoWrapper>;
+};
+
+export const VideoStripDemo = () => {
+  return <VideoWrapper mode="videostrip"></VideoWrapper>;
 };

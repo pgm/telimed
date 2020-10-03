@@ -1,7 +1,23 @@
 import React from "react";
-// import _ from "lodash";
-// import { componentGetCompareProps } from "./Shared";
-import "./RemoteTrack.css";
+import "./Video.css";
+
+// props: videos = list of {videoTrack, audioTrack, label}
+
+export function VideoStrip(props) {
+  return (
+    <div className="video-strip">
+      {props.children}
+      {props.videos.map((video, i) => (
+        <Video
+          key={i}
+          videoTrack={video.videoTrack}
+          audioTrack={video.audioTrack}
+          label={video.label}
+        />
+      ))}
+    </div>
+  );
+}
 
 // props: videoTrack, audioTrack
 export class Video extends React.Component {
@@ -61,17 +77,12 @@ export class Video extends React.Component {
   }
 
   render() {
+    const { label } = this.props;
     return (
-      <div>
-        <div>
-          <span>???</span>
-        </div>
-        <div>
-          <video autoPlay="1" ref={this.videoRef} style={{ width: "200px" }} />
-        </div>
-        <div>
-          <audio autoPlay="1" ref={this.audioRef} />
-        </div>
+      <div className="video-block">
+        <video autoPlay="1" ref={this.videoRef} />
+        <span>{label}</span>
+        <audio autoPlay="1" ref={this.audioRef} />
       </div>
     );
   }
