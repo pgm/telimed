@@ -16,9 +16,11 @@ export class Video extends React.Component {
 
     if (audioTrack) {
       audioTrack.attach(this.audioRef.current);
+      console.log("Attaching audio 1");
     }
     if (videoTrack) {
       videoTrack.attach(this.videoRef.current);
+      console.log("Attaching video 1");
     }
   }
 
@@ -41,25 +43,31 @@ export class Video extends React.Component {
       if (prevVideoTrack) {
         prevVideoTrack.detach(this.videoRef.current);
       }
-      videoTrack.attach(this.videoRef.current);
+      if (videoTrack) {
+        videoTrack.attach(this.videoRef.current);
+        console.log("Attaching video 1");
+      }
     }
 
     if (prevAudioTrack !== audioTrack) {
       if (prevAudioTrack) {
         prevAudioTrack.detach(this.audioRef.current);
       }
-      audioTrack.attach(this.audioRef.current);
+      if (audioTrack) {
+        audioTrack.attach(this.audioRef.current);
+        console.log("Attaching audio 1");
+      }
     }
   }
 
   render() {
     return (
-      <div class="remote_track">
-        <div class="remote_track_controls">
+      <div>
+        <div>
           <span>???</span>
         </div>
-        <div class="remote_track_body">
-          <video autoPlay="1" ref={this.videoRef} />
+        <div>
+          <video autoPlay="1" ref={this.videoRef} style={{ width: "200px" }} />
         </div>
         <div>
           <audio autoPlay="1" ref={this.audioRef} />

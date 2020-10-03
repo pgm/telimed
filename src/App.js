@@ -2,157 +2,18 @@ import React from "react";
 import "./App.css";
 import { LocalTracks } from "./LocalTracks";
 import _ from "lodash";
-// import { RemoteTrack } from "./RemoteTrack";
-// import { v4 as uuidv4 } from "uuid";
 import { Settings } from "./Settings";
-
-class JistiStuff {
-  constructor(serverURL) {
-    this.serverURL = serverURL;
-    this.remoteTracks = [];
-    this.onRoomTracksChanged = [];
-  }
-
-  enumerateDevices() {
-    const promise = new Promise((resolve, reject) => {
-      window.JitsiMeetJS.mediaDevices.enumerateDevices((devices) =>
-        resolve(devices)
-      );
-    });
-
-    return promise;
-  }
-
-  disconnect() {
-    return this.activeRoom.leave().then(() => {
-      if (this.activeConnection) {
-        this.activeConnection.disconnect();
-      }
-    });
-  }
-
-  connect(roomId) {
-    this.activeConnection = new window.JitsiMeetJS.JitsiConnection(null, null, {
-      hosts: {
-        domain: this.serverURL,
-        muc: `conference.${this.serverURL}`, // FIXME: use XEP-0030
-      },
-      serviceUrl: `wss://${this.serverURL}/xmpp-websocket?room=${roomId}`,
-      clientNode: `https://${this.serverURL}`,
-    });
-
-    const promise = new Promise((resolve, reject) => {
-      // onConnectionSuccess = () => {
-      //   const { roomId } = this.props;
-      //   this.activeRoom = this.activeConnection.initJitsiConference(roomId, {
-      //     openBridgeChannel: true,
-      //   });
-      //   this.activeRoom.addEventListener(
-      //     window.JitsiMeetJS.events.conference.TRACK_ADDED,
-      //     this.onRoomTrackAdded
-      //   );
-      //   this.activeRoom.addEventListener(
-      //     window.JitsiMeetJS.events.conference.TRACK_REMOVED,
-      //     this.onRoomTrackRemoved
-      //   );
-      //   this.activeRoom.join();
-      //   resolve();
-      // };
-      // onConnectionDisconnect = () => {
-      //   this.props.jitsiController.activeConnection.removeEventListener(
-      //     window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      //     this.onConnectionSuccess
-      //   );
-      //   this.props.jitsiController.activeConnection.removeEventListener(
-      //     window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
-      //     this.onConnectionFailed
-      //   );
-      //   this.props.jitsiController.activeConnection.removeEventListener(
-      //     window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      //     this.onConnectionDisconnect
-      //   );
-      //   this.props.jitsiController.activeRoom.removeEventListener(
-      //     window.JitsiMeetJS.events.conference.TRACK_ADDED,
-      //     this.onRoomTrackAdded
-      //   );
-      //   this.props.jitsiController.activeRoom.removeEventListener(
-      //     window.JitsiMeetJS.events.conference.TRACK_REMOVED,
-      //     this.onRoomTrackRemoved
-      //   );
-      // };
-      // onConnectionFailed = (a, b, c, d) => {
-      //   reject(a);
-      // };
-      // this.activeConnection.addEventListener(
-      //   window.JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      //   onConnectionSuccess
-      // );
-      // this.activeConnection.addEventListener(
-      //   window.JitsiMeetJS.events.connection.CONNECTION_FAILED,
-      //   onConnectionFailed
-      // );
-      // this.activeConnection.addEventListener(
-      //   window.JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      //   this.onConnectionDisconnect
-      // );
-      // this.activeConnection.connect();
-    });
-
-    return promise;
-  }
-
-  fireRoomTracksChanged = () => {
-    // remoteTrackIds = _.map(this.props.jitsiController.remoteTracks, (rt) => {
-    //   return { id: rt.id, participantId: rt.participantId };
-    // });
-    // _.forEach(this.onRoomTracksChanged, (listener) => listener(remoteTrackIds));
-  };
-
-  onRoomTrackAdded = (track) => {
-    if (track.isLocal() === true) {
-      return;
-    }
-    let newTrackId = track.getId();
-    console.log(`Track Added: ${newTrackId}`);
-    let matchTrack = _.find(this.remoteTracks, { id: newTrackId });
-    if (matchTrack) {
-      return;
-    }
-    let trackInfo = {
-      id: newTrackId,
-      participantId: track.getParticipantId(),
-      type: track.getType(),
-      track: track,
-    };
-    this.remoteTracks.push(trackInfo);
-
-    this.fireRoomTracksChanged();
-  };
-
-  onRoomTrackRemoved = (track) => {
-    if (track.isLocal() === true) {
-      return;
-    }
-    let trackId = track.getId();
-    this.props.jitsiController.remoteTracks = _.reject(
-      this.props.jitsiController.remoteTracks,
-      { id: trackId }
-    );
-
-    this.fireRoomTracksChanged();
-  };
-}
-
+import { Video } from "./Video";
+// props: jitsi
 export class App extends React.Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      jitsi: JistiStuff(this.props.serverURL),
       selectedSpeakerDeviceId: "",
-      defaultMicId: "",
-      defaultVideoId: "",
-      defaultSpeakerId: "",
+      defaultAudioInput: "",
+      defaultAudioOutput: "",
+      defaultVideoInput: "",
       deviceList: [],
       status: "closed",
       lastError: "",
@@ -163,7 +24,9 @@ export class App extends React.Component {
   }
 
   componentDidMount() {
-    this.jitsi.enumerateDevices().then((devices) => {
+    const { jitsi } = this.props;
+
+    jitsi.enumerateDevices().then((devices) => {
       let newDeviceList = [];
       for (let device of devices) {
         // if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
@@ -174,34 +37,35 @@ export class App extends React.Component {
         });
         // }
       }
-      let micId =
+
+      let defaultAudioInput =
         (_.find(newDeviceList, { type: "audioinput" }) || {}).id || "none";
-      let videoId =
+      let defaultVideoInput =
         (_.find(newDeviceList, { type: "videoinput" }) || {}).id || "none";
-      let speakerId =
+      let defaultAudioOutput =
         (_.find(newDeviceList, { type: "audiooutput" }) || {}).id || "none";
+
       console.log("newDeviceList", newDeviceList);
       this.setState({
         deviceList: newDeviceList,
-        defaultMicId: micId,
-        defaultVideoId: videoId,
-        defaultSpeakerId: speakerId,
+        defaultAudioInput: defaultAudioInput,
+        defaultVideoInput: defaultVideoInput,
+        defaultAudioOutput: defaultAudioOutput,
         loaded: true,
       });
     });
   }
 
-  componentDidUpdate() {}
-
   onSpeakerChanged = (newSpeakerId) => {
     this.setState({
       selectedSpeakerDeviceId: newSpeakerId,
     });
+    // call setAudioOutput on all remote tracks
   };
 
-  onRoomTracksChanged = (remoteTrackIds) => {
+  onRoomTracksChanged = (remoteTracks) => {
     this.setState({
-      remoteTrackIds: remoteTrackIds,
+      remoteTracks: remoteTracks,
     });
   };
 
@@ -210,8 +74,8 @@ export class App extends React.Component {
     this.setState({
       status: "Joining...",
     });
-    this.state.jitsi
-      .connect()
+    this.jitsi
+      .connect(roomId)
       .then(() => {
         this.setState({
           status: "open",
@@ -229,36 +93,39 @@ export class App extends React.Component {
   };
 
   onDisconnect = () => {
-    if (this.state.activeRoomId) {
-      this.setState({
-        status: "Leaving...",
-      });
+    this.setState({
+      status: "Leaving...",
+    });
 
-      this.state.jitsi.disconnect().then(() => {
-        this.setState({
-          status: "closed",
-          activeRoomId: null,
-        });
+    this.state.jitsi.disconnect().then(() => {
+      this.setState({
+        status: "closed",
+        activeRoomId: null,
       });
-    }
+    });
   };
 
-  renderRemoteTracks = (trackGroups = {}, selectedSpeakerDeviceId) => {
-    let ret = [];
+  renderRemoteTracks = (remoteTracks) => {
+    let remoteTracksByParticipant = _.groupBy(remoteTracks, (rt) => {
+      return rt.participantId;
+    });
 
-    let participantIds = _.keys(trackGroups);
-
+    // maybe add a sort here
+    let participantIds = _.keys(remoteTracksByParticipant);
     if (participantIds.length === 0) {
-      return null;
+      return [];
     }
+
+    let ret = [];
     for (let participantId of participantIds) {
+      let tracks = remoteTracksByParticipant[participantId];
+
+      let audio = _.find(tracks, (track) => track.getType() == "audio");
+      let video = _.find(tracks, (track) => track.getType() == "video");
+
       ret.push(
         <div key={participantId} className="B_Body_Block">
-          {/* <RemoteTrack
-            jitsiController={this.props.jitsiController}
-            trackIds={trackGroups[participantId]}
-            selectedSpeakerDeviceId={selectedSpeakerDeviceId}
-          /> */}
+          <Video videoTrack={video} audioTrack={audio} />
         </div>
       );
     }
@@ -276,7 +143,7 @@ export class App extends React.Component {
       defaultSpeakerId,
       deviceList,
       loaded = false,
-      remoteTrackIds = [],
+      remoteTracks = [],
       activeRoomId,
     } = this.state;
 
@@ -289,10 +156,6 @@ export class App extends React.Component {
         </div>
       );
     }
-
-    let remoteTrackGroups = _.groupBy(remoteTrackIds, (rt) => {
-      return rt.participantId;
-    });
 
     return (
       <div className="App">
@@ -335,12 +198,7 @@ export class App extends React.Component {
           <div className="B_Header">
             <h3>Them</h3>
           </div>
-          <div className="B_Body">
-            {this.renderRemoteTracks(
-              remoteTrackGroups,
-              selectedSpeakerDeviceId
-            )}
-          </div>
+          <div className="B_Body">{this.renderRemoteTracks(remoteTracks)}</div>
         </div>
       </div>
     );
